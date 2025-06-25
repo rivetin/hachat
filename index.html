@@ -31,6 +31,9 @@
         body {
             font-family: 'Inter', sans-serif;
         }
+        #name-selection-form, #loading-status {
+            transition: opacity 0.3s ease-in-out;
+        }
     </style>
 </head>
 <body class="bg-slate-900 text-white antialiased">
@@ -48,8 +51,8 @@
                 </ul>
             </div>
             <div class="mt-4 p-2 bg-slate-900 rounded-lg border border-slate-700">
-                <p class="text-xs text-slate-400 mb-1">Your Unique ID:</p>
-                <p id="your-id" class="text-xs font-mono break-all text-sky-300">Generating...</p>
+                <p class="text-xs text-slate-400 mb-1">Your Alias:</p>
+                <p id="your-id" class="text-sm font-mono break-all text-sky-300">...</p>
             </div>
         </div>
 
@@ -59,12 +62,10 @@
                 <h1 class="text-xl font-bold">Public Chat Room</h1>
             </header>
             
-            <!-- Messages Display -->
             <main id="chat-messages" class="flex-grow p-4 overflow-y-auto space-y-4">
                 <!-- Chat messages will be populated by JavaScript -->
             </main>
 
-            <!-- Message Input Form -->
             <footer class="p-4 bg-slate-800/30">
                 <form id="chat-form" class="flex items-center gap-4">
                     <input type="text" id="message-input" placeholder="Type your message..." autocomplete="off" class="flex-grow bg-slate-700 border border-slate-600 rounded-full py-3 px-5 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all">
@@ -78,11 +79,28 @@
 
     <!-- Initial Loading / Welcome Modal -->
     <div id="welcome-modal" class="fixed inset-0 bg-slate-900 bg-opacity-80 backdrop-blur-sm flex items-center justify-center z-50 transition-opacity duration-300">
-        <div class="bg-slate-800 p-8 rounded-xl shadow-2xl border border-slate-700 text-center">
-            <h2 class="text-2xl font-bold text-sky-400 mb-4">P2P Chat</h2>
-            <p id="modal-status" class="text-slate-300">Connecting to peer network...</p>
-            <div class="mt-6 h-2 bg-slate-700 rounded-full overflow-hidden">
-                <div class="h-2 bg-sky-500 animate-pulse w-full"></div>
+        <div class="bg-slate-800 p-8 rounded-xl shadow-2xl border border-slate-700 text-center w-full max-w-md">
+            <div id="loading-status">
+                <h2 class="text-2xl font-bold text-sky-400 mb-4">P2P Chat</h2>
+                <p class="text-slate-300">Connecting to peer network...</p>
+                <div class="mt-6 h-2 bg-slate-700 rounded-full overflow-hidden">
+                    <div class="h-2 bg-sky-500 animate-pulse w-full"></div>
+                </div>
+            </div>
+            <div id="name-selection-form" class="opacity-0" style="display: none;">
+                 <h2 class="text-2xl font-bold text-sky-400 mb-4">Choose Your Name</h2>
+                 <p class="text-slate-400 mb-6">Enter a unique name or generate a cool one.</p>
+                 <form id="name-form">
+                    <input type="text" id="name-input" placeholder="Enter your name..." class="w-full bg-slate-700 border border-slate-600 rounded-lg py-3 px-4 text-center focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    <p id="name-error" class="text-red-400 text-sm h-5 mt-2"></p>
+                    <button type="submit" id="set-name-btn" class="w-full mt-2 bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 px-4 rounded-lg transition-colors">Join Chat</button>
+                 </form>
+                 <div class="relative flex py-5 items-center">
+                    <div class="flex-grow border-t border-slate-600"></div>
+                    <span class="flex-shrink mx-4 text-slate-500">OR</span>
+                    <div class="flex-grow border-t border-slate-600"></div>
+                </div>
+                 <button id="generate-name-btn" class="w-full bg-slate-600 hover:bg-slate-500 text-white font-bold py-3 px-4 rounded-lg transition-colors">Generate a Cool Name</button>
             </div>
         </div>
     </div>
@@ -91,8 +109,6 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             // --- Configuration and Initialization ---
-            
-            // Connect to Gun, using public relays to find peers
             const gun = Gun(['https://gun-manhattan.herokuapp.com/gun']);
             const user = gun.user();
             
@@ -104,12 +120,18 @@
             const yourIdElement = document.getElementById('your-id');
             const appContainer = document.getElementById('app-container');
             const welcomeModal = document.getElementById('welcome-modal');
-            const modalStatus = document.getElementById('modal-status');
+            const loadingStatus = document.getElementById('loading-status');
+            const nameSelectionForm = document.getElementById('name-selection-form');
+            const nameForm = document.getElementById('name-form');
+            const nameInput = document.getElementById('name-input');
+            const nameError = document.getElementById('name-error');
+            const generateNameBtn = document.getElementById('generate-name-btn');
 
             // --- State Management ---
             let currentUserId = null;
             const onlineUsers = new Map();
             const messages = new Map();
+            const coolNames = ["CyberGlow", "NeonSpecter", "QuantumFox", "VoidRunner", "PixelStorm"];
 
             // --- Graph References ---
             const chatPath = 'p2p-chat-app/public-chat';
@@ -118,78 +140,94 @@
 
             // --- Core Functions ---
 
-            /**
-             * Renders the list of online users from the local state.
-             */
             function renderUsers() {
-                userListEl.innerHTML = ''; // Clear the list
-                // Sort for consistent display order
-                const sortedUsers = Array.from(onlineUsers.entries()).sort();
+                userListEl.innerHTML = '';
+                const sortedUsers = Array.from(onlineUsers.values()).filter(u => u && u.alias).sort((a,b) => a.alias.localeCompare(b.alias));
 
-                sortedUsers.forEach(([id, userData]) => {
-                    if (!userData) return; // Skip null/offline users
+                sortedUsers.forEach((userData) => {
                     const li = document.createElement('li');
-                    li.className = `p-2 rounded-md break-all text-sm font-mono ${id === currentUserId ? 'bg-sky-800/50 text-sky-300' : 'bg-slate-700 text-slate-300'}`;
-                    li.textContent = id;
-                    if (id === currentUserId) {
+                    li.className = `p-2 rounded-md break-all text-sm font-mono ${userData.pub === currentUserId ? 'bg-sky-800/50 text-sky-300' : 'bg-slate-700 text-slate-300'}`;
+                    li.textContent = userData.alias;
+                    if (userData.pub === currentUserId) {
                         li.textContent += " (You)";
                     }
                     userListEl.appendChild(li);
                 });
             }
-
-            /**
-             * Renders messages from the local state.
-             */
+            
             function renderMessages() {
-                chatMessagesEl.innerHTML = ''; // Clear the display
-                // Sort messages by timestamp
+                chatMessagesEl.innerHTML = '';
                 const sortedMessages = Array.from(messages.values()).sort((a, b) => a.timestamp - b.timestamp);
 
                 sortedMessages.forEach(msg => {
-                    if(!msg || !msg.text || !msg.userId) return; // Skip invalid message objects
+                    if(!msg || !msg.text || !msg.userId) return;
 
+                    const senderData = Array.from(onlineUsers.values()).find(u => u && u.pub === msg.userId);
+                    const senderAlias = senderData ? senderData.alias : 'Unknown';
                     const isMyMessage = msg.userId === currentUserId;
+
                     const messageWrapper = document.createElement('div');
                     messageWrapper.className = `flex flex-col ${isMyMessage ? 'items-end' : 'items-start'}`;
 
                     const messageBubble = document.createElement('div');
                     messageBubble.className = `max-w-xs md:max-w-md lg:max-w-lg p-3 rounded-2xl shadow ${isMyMessage ? 'bg-sky-600 rounded-br-none' : 'bg-slate-700 rounded-bl-none'}`;
                     
-                    const senderId = document.createElement('p');
-                    senderId.className = 'text-xs font-mono break-all opacity-70 mb-1';
-                    senderId.textContent = msg.userId;
+                    const senderIdEl = document.createElement('p');
+                    senderIdEl.className = 'text-xs font-semibold break-all opacity-80 mb-1';
+                    senderIdEl.textContent = senderAlias;
 
                     const messageText = document.createElement('p');
                     messageText.className = 'text-white text-base';
                     messageText.textContent = msg.text;
 
-                    messageBubble.appendChild(senderId);
+                    messageBubble.appendChild(senderIdEl);
                     messageBubble.appendChild(messageText);
                     messageWrapper.appendChild(messageBubble);
                     chatMessagesEl.appendChild(messageWrapper);
                 });
-                // Auto-scroll to the latest message
                 chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
             }
 
+            function isAliasTaken(alias) {
+                for (const userData of onlineUsers.values()) {
+                    if (userData && userData.alias && userData.alias.toLowerCase() === alias.toLowerCase()) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            function finalizeLogin(alias) {
+                user.create(Gun.text.random(10), Gun.text.random(10), (ack) => {
+                    if (ack.err) {
+                        nameError.textContent = `Error: ${ack.err}`;
+                        return;
+                    }
+                    user.auth(ack.sea);
+                    currentUserId = user.is.pub;
+                    yourIdElement.textContent = alias;
+
+                    usersNode.get(currentUserId).put({ pub: currentUserId, alias: alias, online: true });
+
+                    setTimeout(() => {
+                        appContainer.classList.remove('opacity-0');
+                        welcomeModal.classList.add('opacity-0');
+                        setTimeout(() => welcomeModal.style.display = 'none', 300);
+                    }, 200);
+                });
+            }
+
             // --- Gun.js Event Handlers ---
-            
-            /**
-             * Listens for real-time updates to the 'users' graph node.
-             */
             usersNode.map().on((userData, userId) => {
-                if (userData) {
+                if (userData && userData.online) {
                     onlineUsers.set(userId, userData);
                 } else {
                     onlineUsers.delete(userId);
                 }
                 renderUsers();
+                renderMessages(); // Re-render messages in case a user's alias was needed
             });
 
-            /**
-             * Listens for new messages on the 'messages' graph node.
-             */
             messagesNode.map().on((message, messageId) => {
                 if(message) {
                     messages.set(messageId, message);
@@ -199,63 +237,65 @@
                 renderMessages();
             });
 
-            // --- User Actions ---
-            /**
-             * Handles the chat form submission to send a new message.
-             * @param {Event} e The form submission event.
-             */
+            // --- User Actions & Event Listeners ---
             function handleSendMessage(e) {
                 e.preventDefault();
                 const messageText = messageInput.value.trim();
                 if (messageText && user.is) {
-                    const message = {
+                    messagesNode.set({
                         userId: user.is.pub,
                         text: messageText,
                         timestamp: Gun.state()
-                    };
-                    // Set the message on the graph; .set() generates a unique ID for the object
-                    messagesNode.set(message);
-                    messageInput.value = ''; // Clear input field
+                    });
+                    messageInput.value = '';
                 }
             }
-            
-            // --- App Initialization and User Creation ---
-            
-            // Create a new, temporary user on each load. No login/password needed.
-            user.create(Gun.text.random(10), Gun.text.random(10), (ack) => {
-                if (ack.err) {
-                    modalStatus.textContent = `Error: ${ack.err}`;
-                    return;
-                }
-                // Authentication successful
-                user.auth(ack.sea);
-                currentUserId = user.is.pub; // The user's public key is their ID
-                yourIdElement.textContent = currentUserId;
-
-                // Announce presence to other peers
-                usersNode.get(currentUserId).put({ online: true });
-
-                // Show the main app and hide the modal
-                modalStatus.textContent = "Connected!";
-                setTimeout(() => {
-                    appContainer.classList.remove('opacity-0');
-                    welcomeModal.classList.add('opacity-0');
-                    setTimeout(() => welcomeModal.style.display = 'none', 300);
-                }, 500);
-            });
-
-
-            // --- Event Listeners ---
             chatForm.addEventListener('submit', handleSendMessage);
             
-            // Handle user leaving the page
+            nameForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                nameError.textContent = '';
+                const alias = nameInput.value.trim();
+                if (!alias) {
+                    nameError.textContent = 'Name cannot be empty.';
+                    return;
+                }
+                if (isAliasTaken(alias)) {
+                    nameError.textContent = 'This name is already taken.';
+                    return;
+                }
+                finalizeLogin(alias);
+            });
+
+            generateNameBtn.addEventListener('click', () => {
+                nameError.textContent = '';
+                let alias;
+                do {
+                    const randomName = coolNames[Math.floor(Math.random() * coolNames.length)];
+                    const randomNumber = Math.floor(1000 + Math.random() * 9000);
+                    alias = `${randomName}_${randomNumber}`;
+                } while (isAliasTaken(alias));
+                finalizeLogin(alias);
+            });
+
             window.addEventListener('beforeunload', () => {
                 if (user.is) {
-                    // Signal to other peers that this user is gone.
-                    // This is best-effort and might not always complete.
-                    usersNode.get(user.is.pub).put(null);
+                    usersNode.get(user.is.pub).put({ online: false });
                 }
             });
+            
+            // --- Initial App Start ---
+            function showNameSelection() {
+                loadingStatus.classList.add('opacity-0');
+                setTimeout(() => {
+                    loadingStatus.style.display = 'none';
+                    nameSelectionForm.style.display = 'block';
+                    setTimeout(() => nameSelectionForm.classList.remove('opacity-0'), 50);
+                }, 300);
+            }
+            
+            // Show the name selection after a brief moment to allow peer connection.
+            setTimeout(showNameSelection, 1500);
         });
     </script>
 </body>
