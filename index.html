@@ -39,10 +39,10 @@
 <body class="bg-slate-900 text-white antialiased">
 
     <!-- Main Application Container -->
-    <div id="app-container" class="flex h-screen w-full opacity-0 transition-opacity duration-500">
+    <div id="app-container" class="flex flex-col md:flex-row h-screen w-full opacity-0 transition-opacity duration-500">
 
         <!-- Left Panel: Online Users -->
-        <div class="w-1/3 md:w-1/4 lg:w-1/5 bg-slate-800/50 p-4 flex flex-col border-r border-slate-700">
+        <div class="w-full md:w-1/4 lg:w-1/5 bg-slate-800/50 p-4 flex flex-col border-b md:border-b-0 md:border-r border-slate-700 min-h-[120px] md:min-h-0">
             <h2 class="text-xl font-bold mb-4 text-sky-400">Online Users</h2>
             <div class="flex-grow overflow-y-auto">
                 <ul id="user-list" class="space-y-2">
@@ -57,18 +57,22 @@
         </div>
 
         <!-- Right Panel: Chat Area -->
-        <div class="w-2/3 md:w-3/4 lg:w-4/5 flex flex-col">
-            <header class="p-4 bg-slate-800/50 border-b border-slate-700 shadow-md">
-                <h1 class="text-xl font-bold">Public Chat Room</h1>
+        <div class="w-full md:w-3/4 lg:w-4/5 flex flex-col h-full">
+            <!-- Chat Tabs -->
+            <div class="flex flex-row overflow-x-auto border-b border-slate-700 bg-slate-900/80">
+                <button id="tab-public" class="tab-btn px-4 py-2 text-sm font-semibold focus:outline-none text-sky-400 border-b-2 border-sky-400 bg-slate-800">Public Room</button>
+                <div id="private-tabs" class="flex flex-row"></div>
+            </div>
+            <header class="p-4 bg-slate-800/50 border-b border-slate-700 shadow-md flex flex-row items-center justify-between">
+                <h1 id="chat-title" class="text-xl font-bold">Public Chat Room</h1>
+                <button id="clear-chat-btn" class="ml-2 px-3 py-1 bg-red-600 hover:bg-red-500 text-white text-xs rounded-lg transition-colors">Clear Chat</button>
             </header>
-            
             <main id="chat-messages" class="flex-grow p-4 overflow-y-auto space-y-4">
                 <!-- Chat messages will be populated by JavaScript -->
             </main>
-
             <footer class="p-4 bg-slate-800/30">
-                <form id="chat-form" class="flex items-center gap-4">
-                    <input type="text" id="message-input" placeholder="Type your message..." autocomplete="off" class="flex-grow bg-slate-700 border border-slate-600 rounded-full py-3 px-5 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all">
+                <form id="chat-form" class="flex items-center gap-2 md:gap-4">
+                    <input type="text" id="message-input" placeholder="Type your message..." autocomplete="off" class="flex-grow bg-slate-700 border border-slate-600 rounded-full py-3 px-4 md:px-5 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all text-sm md:text-base">
                     <button type="submit" class="bg-sky-600 hover:bg-sky-500 text-white rounded-full p-3 transition-colors flex-shrink-0 shadow-lg hover:shadow-sky-500/50">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-send"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                     </button>
@@ -126,11 +130,18 @@
             const nameInput = document.getElementById('name-input');
             const nameError = document.getElementById('name-error');
             const generateNameBtn = document.getElementById('generate-name-btn');
+            const tabPublicBtn = document.getElementById('tab-public');
+            const privateTabsEl = document.getElementById('private-tabs');
+            const chatTitleEl = document.getElementById('chat-title');
+            const clearChatBtn = document.getElementById('clear-chat-btn');
 
             // --- State Management ---
             let currentUserId = null;
             const onlineUsers = new Map();
-            const messages = new Map();
+            const messages = new Map(); // For current chat only
+            const allPrivateMessages = {}; // {chatId: Map}
+            const openPrivateChats = new Set(); // userId strings
+            let currentChat = { type: 'public', id: null }; // {type: 'public'|'private', id: userId}
             const coolNames = ["CyberGlow", "NeonSpecter", "QuantumFox", "VoidRunner", "PixelStorm"];
 
             // --- Graph References ---
@@ -138,48 +149,79 @@
             const usersNode = gun.get(`${chatPath}/users`);
             const messagesNode = gun.get(`${chatPath}/messages`);
 
-            // --- Core Functions ---
+            // --- Private Chat Helper ---
+            function getPrivateChatId(userA, userB) {
+                return [userA, userB].sort().join('_');
+            }
+            function getPrivateChatPath(userA, userB) {
+                return `p2p-chat-app/private-chat/${getPrivateChatId(userA, userB)}`;
+            }
 
+            // --- Core Functions ---
             function renderUsers() {
                 userListEl.innerHTML = '';
                 const sortedUsers = Array.from(onlineUsers.values()).filter(u => u && u.alias).sort((a,b) => a.alias.localeCompare(b.alias));
 
                 sortedUsers.forEach((userData) => {
                     const li = document.createElement('li');
-                    li.className = `p-2 rounded-md break-all text-sm font-mono ${userData.pub === currentUserId ? 'bg-sky-800/50 text-sky-300' : 'bg-slate-700 text-slate-300'}`;
-                    li.textContent = userData.alias;
-                    if (userData.pub === currentUserId) {
-                        li.textContent += " (You)";
+                    li.className = `p-2 rounded-md break-all text-sm font-mono cursor-pointer transition-colors ${userData.pub === currentUserId ? 'bg-sky-800/50 text-sky-300' : 'bg-slate-700 text-slate-300 hover:bg-sky-700/60'}`;
+                    li.textContent = userData.alias + (userData.pub === currentUserId ? ' (You)' : '');
+                    li.title = userData.pub;
+                    if (userData.pub !== currentUserId) {
+                        li.addEventListener('click', () => openPrivateChat(userData.pub, userData.alias));
                     }
                     userListEl.appendChild(li);
                 });
             }
-            
+
+            function renderTabs() {
+                // Render private chat tabs
+                privateTabsEl.innerHTML = '';
+                openPrivateChats.forEach(userId => {
+                    const userData = onlineUsers.get(userId);
+                    const alias = userData ? userData.alias : 'Unknown';
+                    const tabBtn = document.createElement('button');
+                    tabBtn.className = `tab-btn px-4 py-2 text-sm font-semibold focus:outline-none border-b-2 transition-colors ${currentChat.type === 'private' && currentChat.id === userId ? 'text-sky-400 border-sky-400 bg-slate-800' : 'text-slate-400 border-transparent bg-slate-900 hover:text-sky-300'}`;
+                    tabBtn.textContent = alias;
+                    tabBtn.title = alias;
+                    tabBtn.addEventListener('click', () => switchToPrivateChat(userId));
+                    // Add close button
+                    const closeBtn = document.createElement('span');
+                    closeBtn.textContent = ' ×';
+                    closeBtn.className = 'ml-1 text-xs text-slate-500 hover:text-red-400 cursor-pointer';
+                    closeBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        closePrivateChat(userId);
+                    });
+                    tabBtn.appendChild(closeBtn);
+                    privateTabsEl.appendChild(tabBtn);
+                });
+            }
+
             function renderMessages() {
                 chatMessagesEl.innerHTML = '';
-                const sortedMessages = Array.from(messages.values()).sort((a, b) => a.timestamp - b.timestamp);
-
+                let msgMap;
+                if (currentChat.type === 'public') {
+                    msgMap = messages;
+                } else {
+                    msgMap = allPrivateMessages[currentChat.id] || new Map();
+                }
+                const sortedMessages = Array.from(msgMap.values()).sort((a, b) => a.timestamp - b.timestamp);
                 sortedMessages.forEach(msg => {
                     if(!msg || !msg.text || !msg.userId) return;
-
-                    const senderData = Array.from(onlineUsers.values()).find(u => u && u.pub === msg.userId);
+                    const senderData = onlineUsers.get(msg.userId);
                     const senderAlias = senderData ? senderData.alias : 'Unknown';
                     const isMyMessage = msg.userId === currentUserId;
-
                     const messageWrapper = document.createElement('div');
                     messageWrapper.className = `flex flex-col ${isMyMessage ? 'items-end' : 'items-start'}`;
-
                     const messageBubble = document.createElement('div');
                     messageBubble.className = `max-w-xs md:max-w-md lg:max-w-lg p-3 rounded-2xl shadow ${isMyMessage ? 'bg-sky-600 rounded-br-none' : 'bg-slate-700 rounded-bl-none'}`;
-                    
                     const senderIdEl = document.createElement('p');
                     senderIdEl.className = 'text-xs font-semibold break-all opacity-80 mb-1';
                     senderIdEl.textContent = senderAlias;
-
                     const messageText = document.createElement('p');
                     messageText.className = 'text-white text-base';
                     messageText.textContent = msg.text;
-
                     messageBubble.appendChild(senderIdEl);
                     messageBubble.appendChild(messageText);
                     messageWrapper.appendChild(messageBubble);
@@ -206,15 +248,50 @@
                     user.auth(ack.sea);
                     currentUserId = user.is.pub;
                     yourIdElement.textContent = alias;
-
                     usersNode.get(currentUserId).put({ pub: currentUserId, alias: alias, online: true });
-
                     setTimeout(() => {
                         appContainer.classList.remove('opacity-0');
                         welcomeModal.classList.add('opacity-0');
                         setTimeout(() => welcomeModal.style.display = 'none', 300);
                     }, 200);
                 });
+            }
+
+            // --- Private Chat Logic ---
+            function openPrivateChat(userId, alias) {
+                if (!openPrivateChats.has(userId)) {
+                    openPrivateChats.add(userId);
+                    allPrivateMessages[userId] = allPrivateMessages[userId] || new Map();
+                    // Subscribe to private chat messages
+                    const privatePath = getPrivateChatPath(currentUserId, userId);
+                    gun.get(`${privatePath}/messages`).map().on((message, messageId) => {
+                        if (message) {
+                            allPrivateMessages[userId].set(messageId, message);
+                        } else {
+                            allPrivateMessages[userId].delete(messageId);
+                        }
+                        if (currentChat.type === 'private' && currentChat.id === userId) {
+                            renderMessages();
+                        }
+                    });
+                }
+                switchToPrivateChat(userId);
+                renderTabs();
+            }
+            function switchToPrivateChat(userId) {
+                currentChat = { type: 'private', id: userId };
+                chatTitleEl.textContent = `Private Chat with ${onlineUsers.get(userId)?.alias || 'Unknown'}`;
+                renderTabs();
+                renderMessages();
+            }
+            function closePrivateChat(userId) {
+                openPrivateChats.delete(userId);
+                if (currentChat.type === 'private' && currentChat.id === userId) {
+                    currentChat = { type: 'public', id: null };
+                    chatTitleEl.textContent = 'Public Chat Room';
+                }
+                renderTabs();
+                renderMessages();
             }
 
             // --- Gun.js Event Handlers ---
@@ -225,6 +302,7 @@
                     onlineUsers.delete(userId);
                 }
                 renderUsers();
+                renderTabs();
                 renderMessages(); // Re-render messages in case a user's alias was needed
             });
 
@@ -234,24 +312,55 @@
                 } else {
                     messages.delete(messageId);
                 }
-                renderMessages();
+                if (currentChat.type === 'public') renderMessages();
             });
 
             // --- User Actions & Event Listeners ---
             function handleSendMessage(e) {
                 e.preventDefault();
                 const messageText = messageInput.value.trim();
-                if (messageText && user.is) {
+                if (!messageText || !user.is) return;
+                if (currentChat.type === 'public') {
                     messagesNode.set({
                         userId: user.is.pub,
                         text: messageText,
                         timestamp: Gun.state()
                     });
-                    messageInput.value = '';
+                } else if (currentChat.type === 'private') {
+                    const privatePath = getPrivateChatPath(currentUserId, currentChat.id);
+                    gun.get(`${privatePath}/messages`).set({
+                        userId: user.is.pub,
+                        text: messageText,
+                        timestamp: Gun.state()
+                    });
                 }
+                messageInput.value = '';
             }
             chatForm.addEventListener('submit', handleSendMessage);
-            
+
+            tabPublicBtn.addEventListener('click', () => {
+                currentChat = { type: 'public', id: null };
+                chatTitleEl.textContent = 'Public Chat Room';
+                renderTabs();
+                renderMessages();
+            });
+
+            clearChatBtn.addEventListener('click', () => {
+                if (currentChat.type === 'public') {
+                    // Remove all public messages
+                    messages.forEach((_, id) => messagesNode.get(id).put(null));
+                    messages.clear();
+                } else if (currentChat.type === 'private') {
+                    const privatePath = getPrivateChatPath(currentUserId, currentChat.id);
+                    const privMap = allPrivateMessages[currentChat.id];
+                    if (privMap) {
+                        privMap.forEach((_, id) => gun.get(`${privatePath}/messages`).get(id).put(null));
+                        privMap.clear();
+                    }
+                }
+                renderMessages();
+            });
+
             nameForm.addEventListener('submit', (e) => {
                 e.preventDefault();
                 nameError.textContent = '';
