@@ -1,96 +1,411 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <script defer src="/_vercel/insights/script.js"></script>
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@exampledev/new.css@1.1.2/new.min.css"
-    />
-    <title>Vercel HTML Starter</title>
-    <meta
-      name="description"
-      content="High-performance HTML based website template."
-    />
-  </head>
-  <body>
-    <h1>Vercel HTML Starter</h1>
-    <p>
-      This template is a simple, but powerful single
-      <code>index.html</code> file deployed to
-      <a href="https://vercel.com">Vercel</a>. When your site is deployed, all
-      static assets (like HTML, JavaScript, CSS, images, and more) are deployed
-      globally to every
-      <a href="https://vercel.com/docs/concepts/edge-network/overview"
-        >Vercel Edge Network</a
-      >
-      region.
-    </p>
-    <h2>Simple, privacy-friendly analytics</h2>
-    <p>
-      Want to understand your visitor traffic? Vercel Analytics gives you
-      first-party, privacy-friendly traffic analytics for your HTML site. This
-      template is already configured using the following script:
-    </p>
-    <pre><code>&lt;script defer src="/_vercel/insights/script.js"&gt;&lt;/script&gt;</code></pre>
-    <p>
-      Learn more about
-      <a href="https://vercel.com/analytics">Vercel Analytics</a>.
-    </p>
-    <h2>Integrated with git</h2>
-    <p>
-      Deploying updates to your site is as simple as
-      <code>git push</code> thanks to Vercel's advanced
-      <a href="https://vercel.com/docs/concepts/git">Git Integration</a>.
-      Support for GitHub, GitLab, Bitbucket is zero-configuration, and with the
-      flexible Vercel CLI and API, you can integrate with any tool possible.
-    </p>
-    <p>
-      Learn more about
-      <a href="https://vercel.com/docs/concepts/git">Git Integration</a>.
-    </p>
-    <h2>Fast <code>gzip</code> compression</h2>
-    <p>
-      To help ensure the smallest possible file sizes for your static assets,
-      the Vercel Edge Network compresses files by default using
-      <code>gzip</code>. You can also optionally use
-      <code>brotli</code> compressesion if you prefer.
-    </p>
-    <p>
-      Learn more about
-      <a href="https://vercel.com/docs/concepts/edge-network/compression"
-        >compression</a
-      >.
-    </p>
-    <h2>Advanced routing configuration</h2>
-    <p>
-      Vercel gives you a variety of ways to configure the routing of your
-      website. For example, adding redirects, rewrites, or headers to your page.
-      While you can use <code>vercel.json</code> to define these through JSON,
-      you can also express your routing configuration as code using
-      <a href="https://vercel.com/docs/concepts/functions/edge-middleware"
-        >Vercel Edge Middleware</a
-      >.
-    </p>
-    <p>
-      Middleware runs before the
-      <a href="https://vercel.com/docs/concepts/edge-network/caching"
-        >Vercel Edge Network Cache</a
-      >, so you can configure routing exactly as your application needs. For
-      example, this template uses <code>middleware.js</code> defined in the root
-      of the repository to add additional security headers to the site:
-    </p>
-    <pre><code>referrer-policy: origin-when-cross-origin
-strict-transport-security: max-age=31536000; includeSubDomains; preload
-x-content-type-options: nosniff
-x-dns-prefetch-control: on
-x-frame-options: DENY</code></pre>
-    <p>
-      Learn more about
-      <a href="https://vercel.com/docs/concepts/functions/edge-middleware"
-        >Vercel Edge Middleware</a
-      >.
-    </p>
-  </body>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Peer-to-Peer Chat (Gun.js)</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Gun.js and SEA (Security, Encryption, Authorization) -->
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gun/sea.js"></script>
+    <style>
+        /* Custom scrollbar for a better look */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        #name-selection-form, #loading-status {
+            transition: opacity 0.3s ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-white antialiased">
+
+    <!-- Main Application Container -->
+    <div id="app-container" class="flex flex-col md:flex-row h-screen w-full opacity-0 transition-opacity duration-500">
+
+        <!-- Left Panel: Online Users -->
+        <div class="w-full md:w-1/4 lg:w-1/5 bg-slate-800/50 p-4 flex flex-col border-b md:border-b-0 md:border-r border-slate-700 min-h-[120px] md:min-h-0">
+            <h2 class="text-xl font-bold mb-4 text-sky-400">Online Users</h2>
+            <div class="flex-grow overflow-y-auto">
+                <ul id="user-list" class="space-y-2">
+                    <!-- User list will be populated by JavaScript -->
+                    <li class="p-2 rounded-md bg-slate-700 animate-pulse">Connecting...</li>
+                </ul>
+            </div>
+            <div class="mt-4 p-2 bg-slate-900 rounded-lg border border-slate-700">
+                <p class="text-xs text-slate-400 mb-1">Your Alias:</p>
+                <p id="your-id" class="text-sm font-mono break-all text-sky-300">...</p>
+            </div>
+        </div>
+
+        <!-- Right Panel: Chat Area -->
+        <div class="w-full md:w-3/4 lg:w-4/5 flex flex-col h-full">
+            <!-- Chat Tabs -->
+            <div class="flex flex-row overflow-x-auto border-b border-slate-700 bg-slate-900/80">
+                <button id="tab-public" class="tab-btn px-4 py-2 text-sm font-semibold focus:outline-none text-sky-400 border-b-2 border-sky-400 bg-slate-800">Public Room</button>
+                <div id="private-tabs" class="flex flex-row"></div>
+            </div>
+            <header class="p-4 bg-slate-800/50 border-b border-slate-700 shadow-md flex flex-row items-center justify-between">
+                <h1 id="chat-title" class="text-xl font-bold">Public Chat Room</h1>
+                <button id="clear-chat-btn" class="ml-2 px-3 py-1 bg-red-600 hover:bg-red-500 text-white text-xs rounded-lg transition-colors">Clear Chat</button>
+            </header>
+            <main id="chat-messages" class="flex-grow p-4 overflow-y-auto space-y-4">
+                <!-- Chat messages will be populated by JavaScript -->
+            </main>
+            <footer class="p-4 bg-slate-800/30">
+                <form id="chat-form" class="flex items-center gap-2 md:gap-4">
+                    <input type="text" id="message-input" placeholder="Type your message..." autocomplete="off" class="flex-grow bg-slate-700 border border-slate-600 rounded-full py-3 px-4 md:px-5 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all text-sm md:text-base">
+                    <button type="submit" class="bg-sky-600 hover:bg-sky-500 text-white rounded-full p-3 transition-colors flex-shrink-0 shadow-lg hover:shadow-sky-500/50">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-send"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                    </button>
+                </form>
+            </footer>
+        </div>
+    </div>
+
+    <!-- Initial Loading / Welcome Modal -->
+    <div id="welcome-modal" class="fixed inset-0 bg-slate-900 bg-opacity-80 backdrop-blur-sm flex items-center justify-center z-50 transition-opacity duration-300">
+        <div class="bg-slate-800 p-8 rounded-xl shadow-2xl border border-slate-700 text-center w-full max-w-md">
+            <div id="loading-status">
+                <h2 class="text-2xl font-bold text-sky-400 mb-4">P2P Chat</h2>
+                <p class="text-slate-300">Connecting to peer network...</p>
+                <div class="mt-6 h-2 bg-slate-700 rounded-full overflow-hidden">
+                    <div class="h-2 bg-sky-500 animate-pulse w-full"></div>
+                </div>
+            </div>
+            <div id="name-selection-form" class="opacity-0" style="display: none;">
+                 <h2 class="text-2xl font-bold text-sky-400 mb-4">Choose Your Name</h2>
+                 <p class="text-slate-400 mb-6">Enter a unique name or generate a cool one.</p>
+                 <form id="name-form">
+                    <input type="text" id="name-input" placeholder="Enter your name..." class="w-full bg-slate-700 border border-slate-600 rounded-lg py-3 px-4 text-center focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    <p id="name-error" class="text-red-400 text-sm h-5 mt-2"></p>
+                    <button type="submit" id="set-name-btn" class="w-full mt-2 bg-sky-600 hover:bg-sky-500 text-white font-bold py-3 px-4 rounded-lg transition-colors">Join Chat</button>
+                 </form>
+                 <div class="relative flex py-5 items-center">
+                    <div class="flex-grow border-t border-slate-600"></div>
+                    <span class="flex-shrink mx-4 text-slate-500">OR</span>
+                    <div class="flex-grow border-t border-slate-600"></div>
+                </div>
+                 <button id="generate-name-btn" class="w-full bg-slate-600 hover:bg-slate-500 text-white font-bold py-3 px-4 rounded-lg transition-colors">Generate a Cool Name</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gun.js Application Logic -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- Configuration and Initialization ---
+            const gun = Gun(['https://gun-manhattan.herokuapp.com/gun']);
+            const user = gun.user();
+            
+            // --- DOM Element References ---
+            const userListEl = document.getElementById('user-list');
+            const chatMessagesEl = document.getElementById('chat-messages');
+            const chatForm = document.getElementById('chat-form');
+            const messageInput = document.getElementById('message-input');
+            const yourIdElement = document.getElementById('your-id');
+            const appContainer = document.getElementById('app-container');
+            const welcomeModal = document.getElementById('welcome-modal');
+            const loadingStatus = document.getElementById('loading-status');
+            const nameSelectionForm = document.getElementById('name-selection-form');
+            const nameForm = document.getElementById('name-form');
+            const nameInput = document.getElementById('name-input');
+            const nameError = document.getElementById('name-error');
+            const generateNameBtn = document.getElementById('generate-name-btn');
+            const tabPublicBtn = document.getElementById('tab-public');
+            const privateTabsEl = document.getElementById('private-tabs');
+            const chatTitleEl = document.getElementById('chat-title');
+            const clearChatBtn = document.getElementById('clear-chat-btn');
+
+            // --- State Management ---
+            let currentUserId = null;
+            const onlineUsers = new Map();
+            const messages = new Map(); // For current chat only
+            const allPrivateMessages = {}; // {chatId: Map}
+            const openPrivateChats = new Set(); // userId strings
+            let currentChat = { type: 'public', id: null }; // {type: 'public'|'private', id: userId}
+            const coolNames = ["CyberGlow", "NeonSpecter", "QuantumFox", "VoidRunner", "PixelStorm"];
+
+            // --- Graph References ---
+            const chatPath = 'p2p-chat-app/public-chat';
+            const usersNode = gun.get(`${chatPath}/users`);
+            const messagesNode = gun.get(`${chatPath}/messages`);
+
+            // --- Private Chat Helper ---
+            function getPrivateChatId(userA, userB) {
+                return [userA, userB].sort().join('_');
+            }
+            function getPrivateChatPath(userA, userB) {
+                return `p2p-chat-app/private-chat/${getPrivateChatId(userA, userB)}`;
+            }
+
+            // --- Core Functions ---
+            function renderUsers() {
+                userListEl.innerHTML = '';
+                const sortedUsers = Array.from(onlineUsers.values()).filter(u => u && u.alias).sort((a,b) => a.alias.localeCompare(b.alias));
+
+                sortedUsers.forEach((userData) => {
+                    const li = document.createElement('li');
+                    li.className = `p-2 rounded-md break-all text-sm font-mono cursor-pointer transition-colors ${userData.pub === currentUserId ? 'bg-sky-800/50 text-sky-300' : 'bg-slate-700 text-slate-300 hover:bg-sky-700/60'}`;
+                    li.textContent = userData.alias + (userData.pub === currentUserId ? ' (You)' : '');
+                    li.title = userData.pub;
+                    if (userData.pub !== currentUserId) {
+                        li.addEventListener('click', () => openPrivateChat(userData.pub, userData.alias));
+                    }
+                    userListEl.appendChild(li);
+                });
+            }
+
+            function renderTabs() {
+                // Render private chat tabs
+                privateTabsEl.innerHTML = '';
+                openPrivateChats.forEach(userId => {
+                    const userData = onlineUsers.get(userId);
+                    const alias = userData ? userData.alias : 'Unknown';
+                    const tabBtn = document.createElement('button');
+                    tabBtn.className = `tab-btn px-4 py-2 text-sm font-semibold focus:outline-none border-b-2 transition-colors ${currentChat.type === 'private' && currentChat.id === userId ? 'text-sky-400 border-sky-400 bg-slate-800' : 'text-slate-400 border-transparent bg-slate-900 hover:text-sky-300'}`;
+                    tabBtn.textContent = alias;
+                    tabBtn.title = alias;
+                    tabBtn.addEventListener('click', () => switchToPrivateChat(userId));
+                    // Add close button
+                    const closeBtn = document.createElement('span');
+                    closeBtn.textContent = ' ×';
+                    closeBtn.className = 'ml-1 text-xs text-slate-500 hover:text-red-400 cursor-pointer';
+                    closeBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        closePrivateChat(userId);
+                    });
+                    tabBtn.appendChild(closeBtn);
+                    privateTabsEl.appendChild(tabBtn);
+                });
+            }
+
+            function renderMessages() {
+                chatMessagesEl.innerHTML = '';
+                let msgMap;
+                if (currentChat.type === 'public') {
+                    msgMap = messages;
+                } else {
+                    msgMap = allPrivateMessages[currentChat.id] || new Map();
+                }
+                const sortedMessages = Array.from(msgMap.values()).sort((a, b) => a.timestamp - b.timestamp);
+                sortedMessages.forEach(msg => {
+                    if(!msg || !msg.text || !msg.userId) return;
+                    const senderData = onlineUsers.get(msg.userId);
+                    const senderAlias = senderData ? senderData.alias : 'Unknown';
+                    const isMyMessage = msg.userId === currentUserId;
+                    const messageWrapper = document.createElement('div');
+                    messageWrapper.className = `flex flex-col ${isMyMessage ? 'items-end' : 'items-start'}`;
+                    const messageBubble = document.createElement('div');
+                    messageBubble.className = `max-w-xs md:max-w-md lg:max-w-lg p-3 rounded-2xl shadow ${isMyMessage ? 'bg-sky-600 rounded-br-none' : 'bg-slate-700 rounded-bl-none'}`;
+                    const senderIdEl = document.createElement('p');
+                    senderIdEl.className = 'text-xs font-semibold break-all opacity-80 mb-1';
+                    senderIdEl.textContent = senderAlias;
+                    const messageText = document.createElement('p');
+                    messageText.className = 'text-white text-base';
+                    messageText.textContent = msg.text;
+                    messageBubble.appendChild(senderIdEl);
+                    messageBubble.appendChild(messageText);
+                    messageWrapper.appendChild(messageBubble);
+                    chatMessagesEl.appendChild(messageWrapper);
+                });
+                chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+            }
+
+            function isAliasTaken(alias) {
+                for (const userData of onlineUsers.values()) {
+                    if (userData && userData.alias && userData.alias.toLowerCase() === alias.toLowerCase()) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            function finalizeLogin(alias) {
+                user.create(Gun.text.random(10), Gun.text.random(10), (ack) => {
+                    if (ack.err) {
+                        nameError.textContent = `Error: ${ack.err}`;
+                        return;
+                    }
+                    user.auth(ack.sea);
+                    currentUserId = user.is.pub;
+                    yourIdElement.textContent = alias;
+                    usersNode.get(currentUserId).put({ pub: currentUserId, alias: alias, online: true });
+                    setTimeout(() => {
+                        appContainer.classList.remove('opacity-0');
+                        welcomeModal.classList.add('opacity-0');
+                        setTimeout(() => welcomeModal.style.display = 'none', 300);
+                    }, 200);
+                });
+            }
+
+            // --- Private Chat Logic ---
+            function openPrivateChat(userId, alias) {
+                if (!openPrivateChats.has(userId)) {
+                    openPrivateChats.add(userId);
+                    allPrivateMessages[userId] = allPrivateMessages[userId] || new Map();
+                    // Subscribe to private chat messages
+                    const privatePath = getPrivateChatPath(currentUserId, userId);
+                    gun.get(`${privatePath}/messages`).map().on((message, messageId) => {
+                        if (message) {
+                            allPrivateMessages[userId].set(messageId, message);
+                        } else {
+                            allPrivateMessages[userId].delete(messageId);
+                        }
+                        if (currentChat.type === 'private' && currentChat.id === userId) {
+                            renderMessages();
+                        }
+                    });
+                }
+                switchToPrivateChat(userId);
+                renderTabs();
+            }
+            function switchToPrivateChat(userId) {
+                currentChat = { type: 'private', id: userId };
+                chatTitleEl.textContent = `Private Chat with ${onlineUsers.get(userId)?.alias || 'Unknown'}`;
+                renderTabs();
+                renderMessages();
+            }
+            function closePrivateChat(userId) {
+                openPrivateChats.delete(userId);
+                if (currentChat.type === 'private' && currentChat.id === userId) {
+                    currentChat = { type: 'public', id: null };
+                    chatTitleEl.textContent = 'Public Chat Room';
+                }
+                renderTabs();
+                renderMessages();
+            }
+
+            // --- Gun.js Event Handlers ---
+            usersNode.map().on((userData, userId) => {
+                if (userData && userData.online) {
+                    onlineUsers.set(userId, userData);
+                } else {
+                    onlineUsers.delete(userId);
+                }
+                renderUsers();
+                renderTabs();
+                renderMessages(); // Re-render messages in case a user's alias was needed
+            });
+
+            messagesNode.map().on((message, messageId) => {
+                if(message) {
+                    messages.set(messageId, message);
+                } else {
+                    messages.delete(messageId);
+                }
+                if (currentChat.type === 'public') renderMessages();
+            });
+
+            // --- User Actions & Event Listeners ---
+            function handleSendMessage(e) {
+                e.preventDefault();
+                const messageText = messageInput.value.trim();
+                if (!messageText || !user.is) return;
+                if (currentChat.type === 'public') {
+                    messagesNode.set({
+                        userId: user.is.pub,
+                        text: messageText,
+                        timestamp: Gun.state()
+                    });
+                } else if (currentChat.type === 'private') {
+                    const privatePath = getPrivateChatPath(currentUserId, currentChat.id);
+                    gun.get(`${privatePath}/messages`).set({
+                        userId: user.is.pub,
+                        text: messageText,
+                        timestamp: Gun.state()
+                    });
+                }
+                messageInput.value = '';
+            }
+            chatForm.addEventListener('submit', handleSendMessage);
+
+            tabPublicBtn.addEventListener('click', () => {
+                currentChat = { type: 'public', id: null };
+                chatTitleEl.textContent = 'Public Chat Room';
+                renderTabs();
+                renderMessages();
+            });
+
+            clearChatBtn.addEventListener('click', () => {
+                if (currentChat.type === 'public') {
+                    // Remove all public messages
+                    messages.forEach((_, id) => messagesNode.get(id).put(null));
+                    messages.clear();
+                } else if (currentChat.type === 'private') {
+                    const privatePath = getPrivateChatPath(currentUserId, currentChat.id);
+                    const privMap = allPrivateMessages[currentChat.id];
+                    if (privMap) {
+                        privMap.forEach((_, id) => gun.get(`${privatePath}/messages`).get(id).put(null));
+                        privMap.clear();
+                    }
+                }
+                renderMessages();
+            });
+
+            nameForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                nameError.textContent = '';
+                const alias = nameInput.value.trim();
+                if (!alias) {
+                    nameError.textContent = 'Name cannot be empty.';
+                    return;
+                }
+                if (isAliasTaken(alias)) {
+                    nameError.textContent = 'This name is already taken.';
+                    return;
+                }
+                finalizeLogin(alias);
+            });
+
+            generateNameBtn.addEventListener('click', () => {
+                nameError.textContent = '';
+                let alias;
+                do {
+                    const randomName = coolNames[Math.floor(Math.random() * coolNames.length)];
+                    const randomNumber = Math.floor(1000 + Math.random() * 9000);
+                    alias = `${randomName}_${randomNumber}`;
+                } while (isAliasTaken(alias));
+                finalizeLogin(alias);
+            });
+
+            window.addEventListener('beforeunload', () => {
+                if (user.is) {
+                    usersNode.get(user.is.pub).put({ online: false });
+                }
+            });
+            
+            // --- Initial App Start ---
+            function showNameSelection() {
+                loadingStatus.classList.add('opacity-0');
+                setTimeout(() => {
+                    loadingStatus.style.display = 'none';
+                    nameSelectionForm.style.display = 'block';
+                    setTimeout(() => nameSelectionForm.classList.remove('opacity-0'), 50);
+                }, 300);
+            }
+            
+            // Show the name selection after a brief moment to allow peer connection.
+            setTimeout(showNameSelection, 1500);
+        });
+    </script>
+</body>
 </html>
