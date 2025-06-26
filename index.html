@@ -36,14 +36,31 @@
         }
     </style>
 </head>
-<body class="bg-slate-900 text-white antialiased">
+<body class="bg-slate-900 text-white antialiased overflow-hidden">
+
+    <!-- Mobile Header -->
+    <header class="md:hidden p-2 bg-slate-900/80 backdrop-blur-sm border-b border-slate-700 flex items-center justify-between fixed top-0 left-0 right-0 z-10">
+        <button id="menu-toggle-btn" class="p-2 text-slate-300 hover:text-sky-400">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-menu"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+        </button>
+        <h1 id="mobile-chat-title" class="text-lg font-bold truncate">Public Room</h1>
+        <div class="w-8"></div> <!-- Spacer -->
+    </header>
 
     <!-- Main Application Container -->
-    <div id="app-container" class="flex flex-col md:flex-row h-screen w-full opacity-0 transition-opacity duration-500">
+    <div id="app-container" class="flex flex-row h-screen w-full opacity-0 transition-opacity duration-500 pt-14 md:pt-0">
 
-        <!-- Left Panel: Online Users -->
-        <div class="w-full md:w-1/4 lg:w-1/5 bg-slate-800/50 p-4 flex flex-col border-b md:border-b-0 md:border-r border-slate-700 min-h-[120px] md:min-h-0">
-            <h2 class="text-xl font-bold mb-4 text-sky-400">Online Users</h2>
+        <!-- Mobile Menu Overlay -->
+        <div id="menu-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden md:hidden"></div>
+
+        <!-- Left Panel: Online Users (Sidebar on Mobile) -->
+        <div id="user-panel" class="fixed md:relative inset-y-0 left-0 z-30 w-64 md:w-1/4 lg:w-1/5 bg-slate-800/95 md:bg-slate-800/50 backdrop-blur-sm md:backdrop-blur-none p-4 flex flex-col border-r border-slate-700 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-bold text-sky-400">Online Users</h2>
+                <button id="menu-close-btn" class="md:hidden p-1 text-slate-400 hover:text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-x"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
             <div class="flex-grow overflow-y-auto">
                 <ul id="user-list" class="space-y-2">
                     <!-- User list will be populated by JavaScript -->
@@ -57,13 +74,13 @@
         </div>
 
         <!-- Right Panel: Chat Area -->
-        <div class="w-full md:w-3/4 lg:w-4/5 flex flex-col h-full">
+        <div class="w-full flex flex-col h-full">
             <!-- Chat Tabs -->
-            <div class="flex flex-row overflow-x-auto border-b border-slate-700 bg-slate-900/80">
+            <div class="hidden md:flex flex-row overflow-x-auto border-b border-slate-700 bg-slate-900/80">
                 <button id="tab-public" class="tab-btn px-4 py-2 text-sm font-semibold focus:outline-none text-sky-400 border-b-2 border-sky-400 bg-slate-800">Public Room</button>
                 <div id="private-tabs" class="flex flex-row"></div>
             </div>
-            <header class="p-4 bg-slate-800/50 border-b border-slate-700 shadow-md flex flex-row items-center justify-between">
+            <header class="hidden md:flex p-4 bg-slate-800/50 border-b border-slate-700 shadow-md flex-row items-center justify-between">
                 <h1 id="chat-title" class="text-xl font-bold">Public Chat Room</h1>
                 <button id="clear-chat-btn" class="ml-2 px-3 py-1 bg-red-600 hover:bg-red-500 text-white text-xs rounded-lg transition-colors">Clear Chat</button>
             </header>
@@ -134,6 +151,11 @@
             const privateTabsEl = document.getElementById('private-tabs');
             const chatTitleEl = document.getElementById('chat-title');
             const clearChatBtn = document.getElementById('clear-chat-btn');
+            const mobileChatTitleEl = document.getElementById('mobile-chat-title');
+            const menuToggleBtn = document.getElementById('menu-toggle-btn');
+            const menuCloseBtn = document.getElementById('menu-close-btn');
+            const menuOverlay = document.getElementById('menu-overlay');
+            const userPanel = document.getElementById('user-panel');
 
             // --- State Management ---
             let currentUserId = null;
@@ -280,15 +302,19 @@
             }
             function switchToPrivateChat(userId) {
                 currentChat = { type: 'private', id: userId };
-                chatTitleEl.textContent = `Private Chat with ${onlineUsers.get(userId)?.alias || 'Unknown'}`;
+                const chatName = `Chat with ${onlineUsers.get(userId)?.alias || 'Unknown'}`;
+                chatTitleEl.textContent = chatName;
+                mobileChatTitleEl.textContent = chatName;
                 renderTabs();
                 renderMessages();
+                closeMenu();
             }
             function closePrivateChat(userId) {
                 openPrivateChats.delete(userId);
                 if (currentChat.type === 'private' && currentChat.id === userId) {
                     currentChat = { type: 'public', id: null };
                     chatTitleEl.textContent = 'Public Chat Room';
+                    mobileChatTitleEl.textContent = 'Public Chat Room';
                 }
                 renderTabs();
                 renderMessages();
@@ -341,8 +367,10 @@
             tabPublicBtn.addEventListener('click', () => {
                 currentChat = { type: 'public', id: null };
                 chatTitleEl.textContent = 'Public Chat Room';
+                mobileChatTitleEl.textContent = 'Public Chat Room';
                 renderTabs();
                 renderMessages();
+                closeMenu();
             });
 
             clearChatBtn.addEventListener('click', () => {
@@ -386,6 +414,19 @@
                 } while (isAliasTaken(alias));
                 finalizeLogin(alias);
             });
+
+            // --- Mobile Menu Logic ---
+            function openMenu() {
+                userPanel.classList.remove('-translate-x-full');
+                menuOverlay.classList.remove('hidden');
+            }
+            function closeMenu() {
+                userPanel.classList.add('-translate-x-full');
+                menuOverlay.classList.add('hidden');
+            }
+            menuToggleBtn.addEventListener('click', openMenu);
+            menuCloseBtn.addEventListener('click', closeMenu);
+            menuOverlay.addEventListener('click', closeMenu);
 
             window.addEventListener('beforeunload', () => {
                 if (user.is) {
