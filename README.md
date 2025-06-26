@@ -25,8 +25,8 @@ A modern, real-time, peer-to-peer chat application built with [Gun.js](https://g
 ### Running Locally
 1. **Clone or Download the Repository:**
    ```sh
-   git clone https://github.com/yourusername/peertopeer-chat.git
-   cd peertopeer-chat
+   git clone https://github.com/rivetin/hachat.git
+   cd hachat
    ```
 2. **Open `index.html` in your browser:**
    - Double-click `index.html` or open it with your preferred browser.
